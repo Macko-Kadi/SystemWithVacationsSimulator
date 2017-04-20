@@ -1,7 +1,10 @@
 package engine;
 
 import java.util.ArrayList;
-
+/**
+*
+*opis
+*/
 public class StatsRecord {
  protected double EN;
  protected double EW;
