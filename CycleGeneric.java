@@ -3,7 +3,6 @@ package engine;
 import java.util.ArrayList;
 
 public class CycleGeneric {
-//		private double tLastChange; 	//when the latest phase change occurs
 	private final int CYCLE_ID;
 	private double tNextPhase;			//when next phase starts
 	private double tNextSlot; 				//when next event occurs
@@ -84,7 +83,6 @@ public class CycleGeneric {
 		return (getCurrentPhaseRemainTime(simTime)<=1.0) ? true : false;
 	};
 	/**
-	 * 
 	 * @return ID of the RI whose phase is currently active
 	 */
 	protected int getCurrRI(){
