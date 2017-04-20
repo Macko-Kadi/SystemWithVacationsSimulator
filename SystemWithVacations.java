@@ -2,7 +2,11 @@ package engine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-
+/**
+*
+*opis
+*
+*/
 public class SystemWithVacations {
 	ArrayList<SourcePSN> listOfSources;
 	ArrayList<Double> listOfRITimes;
