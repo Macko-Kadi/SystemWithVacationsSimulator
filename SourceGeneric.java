@@ -1,8 +1,5 @@
 package engine;
-/**
-*
-*opis
-*/
+
 public abstract class SourceGeneric {
 	protected final int SRC_ID; //ID of the source
 	protected final int RI; 

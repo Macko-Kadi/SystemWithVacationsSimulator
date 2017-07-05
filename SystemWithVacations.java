@@ -2,11 +2,7 @@ package engine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-/**
-*
-*opis
-*
-*/
+
 public class SystemWithVacations {
 	ArrayList<SourcePSN> listOfSources;
 	ArrayList<Double> listOfRITimes;
@@ -26,11 +22,11 @@ public class SystemWithVacations {
 		Helper.SLOTED=true;
 		Helper.PRIORITIES=false;
 		Helper.DEBUG_SYSTEM_STATE=true;
-		double T0=10.0;
-		double T1=10.0;
-		double lambda0=0.499;
-		double lambda1=0.0;
-		int bufor0 = 100;
+		double T0=5.0;
+		double T1=5.0;
+		double lambda0=0.4;
+		double lambda1=0.2;
+		int bufor0 = 40;
 		int bufor1 = 2;
 		
 		/*//Third RI
@@ -40,11 +36,11 @@ public class SystemWithVacations {
 		int seed2 = startSeed_+321;*/
 		
 		//set simulation parameters
-		int SIM_SECONDS=10; //aproximated simulation time (in the real world... is there any ?)
+		int SIM_SECONDS=5; //aproximated simulation time (in the real world... is there any ?)
 		Helper.MAX_SIM_TIME=SIM_SECONDS*3000000.0;
 		Helper.START_COLLECT_TIME=SIM_SECONDS*300000.0;	
 		int seed0 = startSeed_;
-		int seed1 = startSeed_+567;
+		int seed1 = startSeed_+5;
 		
 		//add parameters to Helper.FILENAME_PATH
 		String temp="_T1-T2="+T0+"-"+T1+"_L1-L2="+Helper.roundDouble(lambda0,2)+"-"+Helper.roundDouble(lambda1,2)+"_B1-B2="+bufor0+"-"+bufor1;
@@ -72,13 +68,13 @@ public class SystemWithVacations {
 									 lambda1,	//lambda 
 									 0.23);	//tStart
 		listOfSources.add(src0);
-		listOfSources.add(src1);
+		//listOfSources.add(src1);
 		listOfRITimes=new ArrayList<Double>(Arrays.asList(T0,T1));
 		listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0,bufor1));
 
 		//SINGLE SYSTEM !
-		//listOfRITimes=new ArrayList<Double>(Arrays.asList(T0));
-		//listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0));
+		listOfRITimes=new ArrayList<Double>(Arrays.asList(T0));
+		listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0));
 		
 		/*//ADD THIRD
 		SourcePSN src2=new SourcePSN(2, 	//RI
@@ -87,8 +83,7 @@ public class SystemWithVacations {
 				 1000,  //pSize
 				 true,  //constSize
 				 lambda2,	//lambda 
-				 0.43);	//tStart
-		listOfSources.add(src2);
+				 0.43);	//tStart		listOfSources.add(src2);
 		listOfRITimes.add(T2);
 		listOfBufforsCap.add(bufor2);	
 		////----END OF THIRD--------//

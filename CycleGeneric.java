@@ -83,6 +83,7 @@ public class CycleGeneric {
 		return (getCurrentPhaseRemainTime(simTime)<=1.0) ? true : false;
 	};
 	/**
+	 * 
 	 * @return ID of the RI whose phase is currently active
 	 */
 	protected int getCurrRI(){
