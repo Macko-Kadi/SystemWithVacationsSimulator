@@ -29,7 +29,6 @@ public final class Helper {
 	public static String FILENAME;
 	public static int ROUND_DEC=4;
 	public  static int[] GUARD_TIME;
-	public static boolean COMPUTE_DISTRIBUTIONS;
 	private Helper(){}
 	
 	public static double roundDouble(double x, int decimalPlaces){

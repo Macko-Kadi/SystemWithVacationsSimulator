@@ -4,10 +4,9 @@ import java.util.ArrayList;
 
 public class Node {
 	public final int NODE_ID;
-	private CycleGeneric cycle;
 	protected boolean isServerBusy=false;
 	private double linkSpeed;
-//	private int[][][] queuesStates; //[slot][Q0][Q1] - for evaluation of 2D Markov chain analysis
+	private int[][][] queuesStates; //[slot][Q0][Q1] - for evaluation of 2D Markov chain analysis
 	protected ArrayList<Queue> listOfQueues; //1 Queue for 1 RI !
 	//the only event a node generates = endOfService !
 	private double tNextEndOfService=Double.MAX_VALUE;
@@ -15,48 +14,48 @@ public class Node {
 	protected final int NUMBER_OF_RIS;
 	//To be enhanced - different packet sizes...
 	protected final int PCKT_TIME=1; //service time of a packet
+	protected int preferedRI=0; //z którego RI chcê wziaæ pakiet
+	private int[] weights={10,10};
+	private int[] utilizedSlots={0,0};
+
+	void setPreferedRI(){
+		
+	}
+	
 	Node(int NODE_ID_, double linkSpeed_, ArrayList<Integer> buforSizes_, ArrayList<Double> RITimes_){
 		NODE_ID=NODE_ID_;
 		linkSpeed=linkSpeed_;
 		NUMBER_OF_RIS=RITimes_.size();	
-		//initialize cycle 
-		cycle=new CycleGeneric(NODE_ID, RITimes_);
-		//initialize Queues
+
 		listOfQueues=new ArrayList<Queue>();
 		for (int i=0;i<NUMBER_OF_RIS;i++){
 			Queue q=new Queue(i, CycleGeneric.getCycleTime(RITimes_),RITimes_.get(i), buforSizes_.get(i));
 			listOfQueues.add(q);
 		}
 		//cant be done, when single system
-//		if(NUMBER_OF_RIS>1)
-//			queuesStates = new int[(int)getCycleTime()][buforSizes_.get(0)+1][buforSizes_.get(1)+1];
+		if(NUMBER_OF_RIS>1)
+			queuesStates = new int[2][buforSizes_.get(0)+1][buforSizes_.get(1)+1];
 		
 	}
 	
+	/*tu zmienione WRR - nie ma zdarzeñ dla cyklu*/
 	protected SystemEvent getEvent(){
-		SystemEvent e=cycle.getEvent();
+		
+	/*	SystemEvent e=cycle.getEvent();
 		if (e.eventTime==tNextEndOfService)
 			return new SystemEvent(tNextEndOfService, 4+e.eventType, 1, NODE_ID);
 		else if (e.eventTime>tNextEndOfService){
 			if (Helper.SLOTED) System.out.println("ERR: Node / getEvent - system sloted and tNextEndOfService<tSlotChange - you should never see this...");
-			return new SystemEvent(tNextEndOfService, 4, 1, NODE_ID);
-		}
-		else return e;
+		*/	return new SystemEvent(tNextEndOfService, 4, 1, NODE_ID);
+	//	}
+	//	else return e;
 	}
 	/**
 	 * changes a slot
 	 * @param t
 	 */
-	protected void slotChange(double t){
-		cycle.slotChange(t);
-	}
-	protected void phaseChange(double t){
-		cycle.phaseChange(t);
-	}
-	protected double getCycleTime(){
-		return cycle.getCycleTime();
-	}
-	/**
+	
+		/**
 	 * Be careful!
 	 * don't use getCurrSlot() inside the updateQueuesStatsJustAfter() 
 	 * because the slot we want to refer is not the currentSlot!
@@ -65,20 +64,15 @@ public class Node {
 	 * 
 	 * @return
 	 */
-	protected int getCurrSlot(){
-		return cycle.getCurrSlot();
-	}
-	protected int getCurrRI(){
-		return cycle.getCurrRI();
-	}
-	/*protected void updateStatsForMarkov(int slot_no_){
+
+	protected void updateStatsForMarkov(int slot_no_){
 		int q0=listOfQueues.get(0).howManyInQueue();
 		int q1=listOfQueues.get(1).howManyInQueue();
 		queuesStates[slot_no_][q0][q1]++;
-	}*/
-	/*protected double[][][] getMarkovDistribution(){
+	}
+	protected double[][][] getMarkovDistribution(){
 		return Helper.normalizeDistr3D(queuesStates);
-	}*/
+	}
 	protected void printQueueLength(){
 		for (Queue q : listOfQueues)
 			System.out.println("Queue"+q.getQID()+" "+q.howManyInQueue());
@@ -88,7 +82,7 @@ public class Node {
 	 * @param slot_no_
 	 */
 	protected void updateQueuesStatsJustBefore(int slot_no_){
-	//	if (Helper.COMPUTE_MARKOV	&& NUMBER_OF_RIS>1) updateStatsForMarkov(slot_no_);
+		if (NUMBER_OF_RIS>1) updateStatsForMarkov(slot_no_);
 		for (Queue q : listOfQueues){
 			q.updateStatsJustBefore(slot_no_);
 			q.updateSystemStatsJustBefore(slot_no_, isServerBusy);
@@ -110,11 +104,11 @@ public class Node {
 	 * @return StatsRecord for the first queue
 	 */
 	protected StatsRecord getStats(double t, boolean syso_details){
-	//	System.out.println("Markov states");
-	//	if (NUMBER_OF_RIS>1){
-	//		System.out.println(Helper.print3D(queuesStates)); 
-	//		System.out.println(Helper.print3D(getMarkovDistribution()));
-	//	}
+		System.out.println("Markov states");
+		if (NUMBER_OF_RIS>1){
+			System.out.println(Helper.print3D(queuesStates)); 
+			System.out.println(Helper.print3D(getMarkovDistribution()));
+		}
 		
 		StatsRecord srs=null;
 		StatsRecord theSrs=null;
@@ -128,7 +122,7 @@ public class Node {
 	
 	public void receive(Packet p, double t){
 		//set whether a packet came in proper RI or not
-		int currRI=cycle.getCurrRI();
+		int currRI=0;
 		p.properRI=(p.getPcktRI()==currRI) ? true : false;
 		//RI the packet came in
 		p.setActRI(currRI);
@@ -164,53 +158,40 @@ public class Node {
 	 */
 	protected void takeToServiceFromQueue(double t, int RI_){
 		Packet p=listOfQueues.get(RI_).takeFromQueue(t);
+		utilizedSlots[RI_]++;
 		tNextEndOfService=Helper.roundDouble(t+p.getSize()/linkSpeed,3);
 		isServerBusy=true;
 		pcktCurrServed=p;
+		if (Helper.DEBUG) System.out.println("node.takeToService - queue: " + RI_);
+		if (Helper.DEBUG) System.out.println("node.utilizedSlots: " + utilizedSlots[0] + " " + utilizedSlots[1]);
 	}
-	
 
-	protected boolean isItPossibleToTakeFromProperQueue(double t){
-		boolean serverBusy=isServerBusy;
-		double remTime=cycle.getCurrentPhaseRemainTime(t);
-		boolean timeEnough=(remTime>=PCKT_TIME);
-		int currRI=cycle.getCurrRI();
-		boolean queueEmpty=listOfQueues.get(currRI).isQueueEmpty();
-	//	System.out.println("isItPossibleToTakeFromProperQueue" + remTime+" "+serverBusy + " " + timeEnough +" " + queueEmpty);
-		return (!serverBusy && 						    		    //server is not busy and
-				timeEnough &&				//remain time is enough, and
-				!queueEmpty);  //something in the queue
-		
-	}
-	protected boolean isItPossibleToTakeFromProperQueuePrio(double t){
-		boolean serverBusy=isServerBusy;
-		double remTime=cycle.getCurrentPhaseRemainTime(t);
-		//albo 0 albo pckt time  - 0 powoduje ¿e nachodzi na inn¹ fazê - dla pckt-time to samo co bez prio
-		boolean timeEnough=(remTime>=PCKT_TIME);
-		int currRI=cycle.getCurrRI();
-		boolean queueEmpty=listOfQueues.get(currRI).isQueueEmpty();
-	//	System.out.println("isItPossibleToTakeFromProperQueue" + remTime+" "+serverBusy + " " + timeEnough +" " + queueEmpty);
-		return (!serverBusy && 						    		    //server is not busy and
-				timeEnough &&				//remain time is enough, and
-				!queueEmpty);  //something in the queue
-		
-	}
-	/**
-	 * Checks whether Server is idle, and returns the first of next queues 
-	 * that has a packet in bufor
-	 *  
-	 * @param t simTime
-	 * @return ID of first of the nexts RIs, that has a packet to service
-	 */
-	protected int fromWhichQueueCanITakeAPacketSloted(double t){
-		if(!isServerBusy){
-			for (int i=1;i<NUMBER_OF_RIS;i++){
-				boolean answer=(!listOfQueues.get((getCurrRI()+i)%NUMBER_OF_RIS).isQueueEmpty());	
-				if (answer) return  ((getCurrRI()+i)%NUMBER_OF_RIS);
-			}
+	protected boolean isItPossibleToTakeFromQueue(double t){
+		if (isServerBusy) return false;		
+
+		//jesli wzi¹³em ju¿ tyle ile powinienem to resetuje i zmieniam preferencje 
+		if (utilizedSlots[preferedRI]==weights[preferedRI]){
+			utilizedSlots[preferedRI]=0;
+			preferedRI=(preferedRI+1)%2;
 		}
-		return -1;				
+		//sprawdzam czy cos jest w kolejce preferowanego
+		boolean queueEmpty=listOfQueues.get(preferedRI).isQueueEmpty();
+		//jesli nie ma to ustawiam utilizedSlots na 0 i prze³¹czam na poprzedni¹,
+		//jesli jest to zwracam true (preferedRI jest widziane globalnie)
+		if (queueEmpty) {
+			utilizedSlots[preferedRI]=0;
+			preferedRI=(preferedRI+1)%2;
+		}
+		else return true;
+		queueEmpty=listOfQueues.get(preferedRI).isQueueEmpty();
+		if (queueEmpty) {
+			utilizedSlots[preferedRI]=0;
+			preferedRI=(preferedRI+1)%2;
+		}
+		else return true;
+		return false;	
 	}
+
 	/**
 	 * Checks whether Server is idle, 
 	 * if it is, then check if next RI has something in queue,
@@ -231,25 +212,9 @@ public class Node {
 	 * @param t simTime
 	 * @return ID of first of the nexts RIs, that has a packet to service
 	 */
-	protected int fromWhichQueueCanITakeAPacketContinous(double t){
-		if(!isServerBusy){
-			for (int i=1;i<NUMBER_OF_RIS;i++){
-				double timeToEndPhase=cycle.getCurrentPhaseRemainTime(t);
-				int ri=(getCurrRI()+i)%NUMBER_OF_RIS;
-				boolean isQueueEmpty=listOfQueues.get(ri).isQueueEmpty();
-				boolean answer=(!isQueueEmpty&& timeToEndPhase>Helper.GUARD_TIME[getCurrRI()]&& timeToEndPhase>=PCKT_TIME);
-				//wersja ¿e GUARD TIME jest na pocz¹tku - nie zrobione
-				//boolean answer=(!isQueueEmpty&& timeToEndPhase>Helper.GUARD_TIME && timeToEndPhase>=PCKT_TIME);
-				
-				if (answer) return  ri;			
-			}
-		}
-		return -1;				
-	}
-	
-	
+		
 	protected void addToQueue(double t, Packet p){
-		p.setArrivingSlot(getCurrSlot());
+		p.setArrivingSlot(0);
 		listOfQueues.get(p.getPcktRI()).addToQueue(t, p);
 	}
 	
