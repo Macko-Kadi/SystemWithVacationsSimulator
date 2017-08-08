@@ -1,5 +1,5 @@
 package engine;
-//test
+
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -14,21 +14,23 @@ public class SystemWithVacations {
 		//set loging paramethers
 		Helper.DEBUG=false;
 		Helper.DEBUG_QUEUE=false;
-		Helper.SAVE_PACKET_TRACE=false;
+		Helper.SAVE_PACKET_TRACE=true;
+		Helper.COMPUTE_DISTRIBUTIONS=false;
 		Helper.DISPLAY_DETAILS_FOR_EACH_SIM=true;
 		Helper.ROUND_DEC=4;
 		
 		//set system parameters !
-		Helper.SLOTED=true;
+		Helper.SLOTED=false;
 		Helper.PRIORITIES=false;
 		Helper.DEBUG_SYSTEM_STATE=true;
-		double T0=5.0;
-		double T1=5.0;
-		double lambda0=0.4;
-		double lambda1=0.2;
-		int bufor0 = 40;
-		int bufor1 = 2;
-		
+		int GT=0;
+		double T0=10.0;
+		double T1=10.0;
+		double lambda0=0.5*5/10;
+		double lambda1=0.5*5/10;
+		int bufor0 = 800;
+		int bufor1 = 800;
+		Helper.GUARD_TIME=new int[]{GT,GT};
 		/*//Third RI
 		double T2=2.0;
 		double lambda2=0.2;
@@ -36,11 +38,14 @@ public class SystemWithVacations {
 		int seed2 = startSeed_+321;*/
 		
 		//set simulation parameters
-		int SIM_SECONDS=5; //aproximated simulation time (in the real world... is there any ?)
+		double SIM_SECONDS=0.4; //aproximated simulation time (in the real world... is there any ?)
 		Helper.MAX_SIM_TIME=SIM_SECONDS*3000000.0;
 		Helper.START_COLLECT_TIME=SIM_SECONDS*300000.0;	
-		int seed0 = startSeed_;
-		int seed1 = startSeed_+5;
+		
+	//	Helper.MAX_SIM_TIME=1000;
+	//	Helper.START_COLLECT_TIME=0;	
+		int seed0 = 111+startSeed_;
+		int seed1 = 222+startSeed_+5;
 		
 		//add parameters to Helper.FILENAME_PATH
 		String temp="_T1-T2="+T0+"-"+T1+"_L1-L2="+Helper.roundDouble(lambda0,2)+"-"+Helper.roundDouble(lambda1,2)+"_B1-B2="+bufor0+"-"+bufor1;
@@ -68,13 +73,13 @@ public class SystemWithVacations {
 									 lambda1,	//lambda 
 									 0.23);	//tStart
 		listOfSources.add(src0);
-		//listOfSources.add(src1);
+		listOfSources.add(src1);
 		listOfRITimes=new ArrayList<Double>(Arrays.asList(T0,T1));
 		listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0,bufor1));
 
 		//SINGLE SYSTEM !
-		listOfRITimes=new ArrayList<Double>(Arrays.asList(T0));
-		listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0));
+		//listOfRITimes=new ArrayList<Double>(Arrays.asList(T0));
+		//listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0));
 		
 		/*//ADD THIRD
 		SourcePSN src2=new SourcePSN(2, 	//RI
@@ -527,7 +532,7 @@ public class SystemWithVacations {
 					currSlot=node.getCurrSlot();
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
 					node.phaseChange(simTime);
-					if (node.isItPossibleToTakeFromProperQueue(simTime))
+					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
@@ -540,13 +545,15 @@ public class SystemWithVacations {
 			case 4: 
 				//4 - end of service
 					RI=node.endOfService(simTime);
-					if (node.isItPossibleToTakeFromProperQueue(simTime))
+				//	System.out.println(simTime+"case4 isServerBusy " +node.isServerBusy);
+					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
 						if (tempRI!=-1) node.takeToServiceFromQueue(simTime, tempRI);
 					}
 					if (Helper.DEBUG) System.out.println(""+simTime+ " end of service RI: "+RI+" | eventType=4");
+			//		System.out.println(simTime+"case 4 isServerBusy " +node.isServerBusy);
 					break;		
 			case 5: 
 				//5 - end of service and change phase --SHOULDN'T_SEE_IT_WHEN_CYCLE_TIME_IS_INT
@@ -559,7 +566,7 @@ public class SystemWithVacations {
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
 					RI=node.endOfService(simTime);
 					node.slotChange(simTime);
-					if (node.isItPossibleToTakeFromProperQueue(simTime))
+					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
@@ -575,7 +582,7 @@ public class SystemWithVacations {
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
 					RI=node.endOfService(simTime);
 					node.phaseChange(simTime);
-					if (node.isItPossibleToTakeFromProperQueue(simTime))
+					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
@@ -593,11 +600,14 @@ public class SystemWithVacations {
 					Packet p=listOfSources.get(e.objectID).genPacket(simTime);
 					node.addToQueue(simTime, p);
 					if (Helper.DEBUG) node.printQueueLength();
-					if (node.isItPossibleToTakeFromProperQueue(simTime))
+					if (node.isItPossibleToTakeFromProperQueuePrio(simTime)){
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
+						
+					}
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
 						if (tempRI!=-1) node.takeToServiceFromQueue(simTime, tempRI);
+				//		System.out.println("case 8, tempRI: "+tempRI);
 					}
 					break;
 			}
@@ -630,6 +640,8 @@ public class SystemWithVacations {
 			long tSim=System.currentTimeMillis();
 			srs.add(SWV.getStats(simTime,Helper.DISPLAY_DETAILS_FOR_EACH_SIM));
 			System.out.println("Simulation  Time [ms]: "+(tSim-tStart));
+			SWV.node.listOfQueues.get(0).printDelays("D:/wyniki/queue-delays-Q0-"+Helper.getCurrDate()+"GT"+Helper.GUARD_TIME[0]+".txt");
+		//	SWV.node.listOfQueues.get(1).printDelays("D:/wyniki/queue-delays-Q1-"+Helper.getCurrDate()+"GT"+Helper.GUARD_TIME[1]+".txt");
 		}
 		if (amountOfSim>1){
 			StatsRecord[] res=StatsRecord.computeMeanAndConfidenceInterval(srs);

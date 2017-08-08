@@ -3,7 +3,7 @@ package engine;
 public class Packet {
 	private final int PCKT_RI;
 	private final int PCKT_SRC_ID; //which source generated the packet
-	private double tCreation=-1; //when packet was generated
+	double tCreation=-1; //when packet was generated
 	private double tTaken=-1; //when packet was taken to server
 	protected boolean properRI=false; //whether packet came to the system within its RI
 	private int actualRI=-1; //RI that packet came to the system within

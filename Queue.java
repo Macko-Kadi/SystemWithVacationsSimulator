@@ -8,13 +8,15 @@ public class Queue {
 	private double fieldBelowEN=0; //time*N(time) -> time*N(time)/time = E[N]
 	private double sumOfEW=0;
 	private double sumOfEWSlots=0;	
-	private double tLastUpdate=0;
+	private double tLastUpdate=Helper.START_COLLECT_TIME;
 	private int numberOfLosses=0;
 	private int numberOfArrivals=0;
 	private final int BUFOR_SIZE;
 	private final int NO_SLOTS;
 	private final int RI_SLOTS;
 	private boolean DEBUG;
+	protected ArrayList<PacketDelay> delays;
+	
 	private ArrayList<Packet> listOfBufferedPackets;
 	/**
 	 * Queue occupancy JUST BEFORE the slot ends
@@ -59,39 +61,51 @@ public class Queue {
 		NO_SLOTS=(int)cycleTime;
 		RI_SLOTS=(int)RITime;
 		BUFOR_SIZE=buf;
-		occupancyDistributionBefore=new int[NO_SLOTS][BUFOR_SIZE+1];
-		occupancyDistributionAfter=new int[NO_SLOTS][BUFOR_SIZE+1];
-		occupancyDistributionPacketComes=new int[BUFOR_SIZE+1];
-		waitingSlotsDistribution=new int[calculateMaxWaitingTime()+1];
-		waitingSlotsDistributionPerSlot=new int[NO_SLOTS][calculateMaxWaitingTime()+1];
+		if(Helper.COMPUTE_DISTRIBUTIONS){
+			occupancyDistributionBefore=new int[NO_SLOTS][BUFOR_SIZE+1];
+			occupancyDistributionAfter=new int[NO_SLOTS][BUFOR_SIZE+1];
+			occupancyDistributionPacketComes=new int[BUFOR_SIZE+1];
+			waitingSlotsDistribution=new int[calculateMaxWaitingTime()+1];
+			waitingSlotsDistributionPerSlot=new int[NO_SLOTS][calculateMaxWaitingTime()+1];	
+			systemOccupancyDistributionAfter=new int[NO_SLOTS][BUFOR_SIZE+2];
+			systemOccupancyDistributionBefore=new int[NO_SLOTS][BUFOR_SIZE+2];
+		}
+		else{
+			occupancyDistributionBefore=new int[1][1];
+			occupancyDistributionAfter=new int[1][1];
+			occupancyDistributionPacketComes=new int[1];
+			waitingSlotsDistribution=new int[1];
+			waitingSlotsDistributionPerSlot=new int[1][1];	
+			systemOccupancyDistributionAfter=new int[1][1];
+			systemOccupancyDistributionBefore=new int[1][1];
+		}
 		listOfBufferedPackets=new ArrayList<Packet>();
-		systemOccupancyDistributionAfter=new int[NO_SLOTS][BUFOR_SIZE+2];
-		systemOccupancyDistributionBefore=new int[NO_SLOTS][BUFOR_SIZE+2];
+		delays=new ArrayList<PacketDelay>();
 	}
 	protected int calculateMaxWaitingTime(){
 		//amount of vacation periods
 		int avp=(int)Math.ceil((double)BUFOR_SIZE/(double)RI_SLOTS);
-		return (BUFOR_SIZE+avp*(NO_SLOTS-RI_SLOTS));
+		return (BUFOR_SIZE+avp*(NO_SLOTS-RI_SLOTS)+1);
 	}
 	protected void updateStatsJustBefore(int slot_no_){
-		occupancyDistributionBefore[slot_no_][howManyInQueue]++;
+		if(Helper.COMPUTE_DISTRIBUTIONS)	occupancyDistributionBefore[slot_no_][howManyInQueue]++;
 	}
 	
 	protected void updateStatsJustAfter(int slot_no_){
-		occupancyDistributionAfter[slot_no_][howManyInQueue]++;
+		if(Helper.COMPUTE_DISTRIBUTIONS)	occupancyDistributionAfter[slot_no_][howManyInQueue]++;
 	}
 	protected void updateSystemStatsJustBefore(int slot_no_, boolean systemState){
 		if (systemState)
-			systemOccupancyDistributionBefore[slot_no_][howManyInQueue+1]++;
+			if(Helper.COMPUTE_DISTRIBUTIONS)	systemOccupancyDistributionBefore[slot_no_][howManyInQueue+1]++;
 		else
-			systemOccupancyDistributionBefore[slot_no_][howManyInQueue]++;
+			if(Helper.COMPUTE_DISTRIBUTIONS)	systemOccupancyDistributionBefore[slot_no_][howManyInQueue]++;
 	}
 	
 	protected void updateSystemStatsJustAfter(int slot_no_, boolean systemState){
 		if (systemState)
-			systemOccupancyDistributionAfter[slot_no_][howManyInQueue+1]++;
+			if(Helper.COMPUTE_DISTRIBUTIONS)	systemOccupancyDistributionAfter[slot_no_][howManyInQueue+1]++;
 		else
-			systemOccupancyDistributionAfter[slot_no_][howManyInQueue]++;
+			if(Helper.COMPUTE_DISTRIBUTIONS)	systemOccupancyDistributionAfter[slot_no_][howManyInQueue]++;
 	}
 	
 	protected boolean isQueueFull(){
@@ -124,7 +138,7 @@ public class Queue {
 	 * @param p Packet
 	 */
 	protected void addToQueue(double t, Packet p){
-		if(Helper.isAfterStart) occupancyDistributionPacketComes[howManyInQueue]++;
+		if(Helper.COMPUTE_DISTRIBUTIONS)	if(Helper.isAfterStart) occupancyDistributionPacketComes[howManyInQueue]++;
 		if(Helper.isAfterStart) updateFieldBelowNT(t);
 		if(Helper.isAfterStart) numberOfArrivals++;
 		if (!isQueueFull()){
@@ -133,8 +147,29 @@ public class Queue {
 		}
 		else{
 			if(Helper.isAfterStart) numberOfLosses++;
-			if(Helper.isAfterStart && Helper.SAVE_PACKET_TRACE) Helper.printPacketStatistic(t, p);
+			//if(Helper.isAfterStart && Helper.SAVE_PACKET_TRACE) Helper.printPacketStatistic(t, p);
+			if(Helper.isAfterStart && Helper.SAVE_PACKET_TRACE) delays.add(new PacketDelay(p.getPcktNr(),t, p.tCreation, p.getTTaken()));
 		}
+	}
+	public void printDelays(String filename){
+		System.out.println("liczba opoznien: " +delays.size());
+		String data="";
+		int j=0;
+		for (int i=0; i<delays.size(); i++){
+			j++;
+			PacketDelay pd=delays.get(i);
+		//	data=data+""+pd.number+"\t"+pd.timeIn+"\t"+pd.delay+"\t"+pd.timeOut+"\t "+pd.simTime+"\n";
+			if(j!=1000)
+				data=data+""+pd.number+"\t "+pd.delay+"\n";			
+			if(j==1000)
+				data=data+""+pd.number+"\t "+pd.delay;		
+			if (j==1000){
+				Helper.writeToFile(filename, data.replace('.', ','));
+				j=0;
+				data="";
+			}
+		}
+	//	Helper.writeToFile(filename, data.replace('.', ','));
 	}
 	/**
 	 * take first queued packet to service
@@ -164,8 +199,8 @@ public class Queue {
 				if (waitingTime%1!=0) {waitingSlots=(int)waitingTime+1;}
 				else if (waitingTime%1==0) {waitingSlots=(int)waitingTime;}				
 				sumOfEWSlots+=waitingSlots;
-				waitingSlotsDistribution[waitingSlots]++;
-				waitingSlotsDistributionPerSlot[p.getArrivingSlot()][waitingSlots]++;
+				if(Helper.COMPUTE_DISTRIBUTIONS)	waitingSlotsDistribution[waitingSlots]++;
+				if(Helper.COMPUTE_DISTRIBUTIONS)	waitingSlotsDistributionPerSlot[p.getArrivingSlot()][waitingSlots]++;
 			}
 			return p;
 		}
@@ -182,6 +217,8 @@ public class Queue {
 	protected void updateFieldBelowNT(double t){
 		double interval=t-tLastUpdate;
 		fieldBelowEN=fieldBelowEN+interval*howManyInQueue;
+		if (Helper.DEBUG_QUEUE)
+			System.out.println("Q_ID: "+Q_ID +" updateFieldBelowNT; tLastUpdate: "+tLastUpdate +" t " + t + " inQueue: " + howManyInQueue );
 		tLastUpdate=t;
 	}
 			
@@ -202,67 +239,67 @@ public class Queue {
 		if (syso) System.out.println(data);
 		Helper.writeToFile(filename,data);
 		//Distribution when packet comes
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrCome.txt";
-		double[] distrCome=Helper.normalizeDistr1D(occupancyDistributionPacketComes);
-		data=Helper.print1D(distrCome);
-		if (syso)System.out.println("-----------distrPcktComes----------");
-		if (syso)System.out.println(data);
-		Helper.writeToFile(filename,data);
-		//Distribution just before	
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrBefore.txt";
-		double[][] distrBefore=Helper.normalizeDistr2D(occupancyDistributionBefore);
-		data=Helper.print2D(distrBefore);
-		if (syso)System.out.println("-------------distrBefore-----------");
-		if (syso)System.out.println(data);
-		Helper.writeToFile(filename,data);
-		//Distribution just after
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrAfter.txt";
-		double[][] distrAfter=Helper.normalizeDistr2D(occupancyDistributionAfter);
-		data=Helper.print2D(distrAfter);
-		if (syso)System.out.println("-------------distrAfter-----------");
-		if (syso)System.out.println(data);	
-		Helper.writeToFile(filename,data);
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-waitingSlotsDistr.txt";
-		double[] distrWaitingSlots=Helper.normalizeDistr1D(waitingSlotsDistribution);
-		data=Helper.print1D(distrWaitingSlots);
-		if (syso)System.out.println("-------------waitingSlotsDistr-----------");
-		if (syso)System.out.println(data);	
-		Helper.writeToFile(filename,data);
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-waitingSlotsDistrPerSlot.txt";
-		double[][] distrWaitingSlotsPerSlot=Helper.normalizeDistr2D(waitingSlotsDistributionPerSlot);
-		data=Helper.print2D(distrWaitingSlotsPerSlot);
-		if (syso)System.out.println("----------waitingSlotsDistrPerSlot---------");
-		if (syso)System.out.println(data);	
-		Helper.writeToFile(filename,data);
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-systemOccupancyBefore.txt";
-		double[][] distrSystemOccupancyDistributionBefore=Helper.normalizeDistr2D(systemOccupancyDistributionBefore);
-		data=Helper.print2D(distrSystemOccupancyDistributionBefore);
-		if (syso)System.out.println("----------SystemOccupancyDistributionBefore---------");
-		if (syso)System.out.println(data);	
-		Helper.writeToFile(filename,data);
-		filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-systemOccupancyAfter.txt";
-		double[][] distrSystemOccupancyDistributionAfter=Helper.normalizeDistr2D(systemOccupancyDistributionAfter);
-		data=Helper.print2D(distrSystemOccupancyDistributionAfter);
-		if (syso)System.out.println("----------SystemOccupancyDistributionAfter---------");
-		if (syso)System.out.println(data);	
-		Helper.writeToFile(filename,data);
-		if(DEBUG){
-			 System.out.println("-----------distrPcktComes (amounts)----------");
-			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrComeDEBUG.txt";
-			data=Helper.print1D(occupancyDistributionPacketComes);
-			System.out.println(data);
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrCome.txt";
+			double[] distrCome=Helper.normalizeDistr1D(occupancyDistributionPacketComes);
+			data=Helper.print1D(distrCome);
+			if (syso)System.out.println("-----------distrPcktComes----------");
+			if (syso)System.out.println(data);
 			Helper.writeToFile(filename,data);
-			System.out.println("--------------distrBefore (amounts)----------");
-			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrBeforeDEBUG.txt";
-			data=Helper.print2D(occupancyDistributionBefore);
-			System.out.println(data);
+			//Distribution just before	
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrBefore.txt";
+			double[][] distrBefore=Helper.normalizeDistr2D(occupancyDistributionBefore);
+			data=Helper.print2D(distrBefore);
+			if (syso)System.out.println("-------------distrBefore-----------");
+			if (syso)System.out.println(data);
 			Helper.writeToFile(filename,data);
-			System.out.println("--------------distrAfter (amounts)-----------");
-			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrAfterDEBUG.txt";
-			data=Helper.print2D(occupancyDistributionAfter);
-			System.out.println(data);
+			//Distribution just after
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrAfter.txt";
+			double[][] distrAfter=Helper.normalizeDistr2D(occupancyDistributionAfter);
+			data=Helper.print2D(distrAfter);
+			if (syso)System.out.println("-------------distrAfter-----------");
+			if (syso)System.out.println(data);	
 			Helper.writeToFile(filename,data);
-		}		
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-waitingSlotsDistr.txt";
+			double[] distrWaitingSlots=Helper.normalizeDistr1D(waitingSlotsDistribution);
+			data=Helper.print1D(distrWaitingSlots);
+			if (syso)System.out.println("-------------waitingSlotsDistr-----------");
+			if (syso)System.out.println(data);	
+			Helper.writeToFile(filename,data);
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-waitingSlotsDistrPerSlot.txt";
+			double[][] distrWaitingSlotsPerSlot=Helper.normalizeDistr2D(waitingSlotsDistributionPerSlot);
+			data=Helper.print2D(distrWaitingSlotsPerSlot);
+			if (syso)System.out.println("----------waitingSlotsDistrPerSlot---------");
+			if (syso)System.out.println(data);	
+			Helper.writeToFile(filename,data);
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-systemOccupancyBefore.txt";
+			double[][] distrSystemOccupancyDistributionBefore=Helper.normalizeDistr2D(systemOccupancyDistributionBefore);
+			data=Helper.print2D(distrSystemOccupancyDistributionBefore);
+			if (syso)System.out.println("----------SystemOccupancyDistributionBefore---------");
+			if (syso)System.out.println(data);	
+			Helper.writeToFile(filename,data);
+			filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-systemOccupancyAfter.txt";
+			double[][] distrSystemOccupancyDistributionAfter=Helper.normalizeDistr2D(systemOccupancyDistributionAfter);
+			data=Helper.print2D(distrSystemOccupancyDistributionAfter);
+			if (syso)System.out.println("----------SystemOccupancyDistributionAfter---------");
+			if (syso)System.out.println(data);	
+			Helper.writeToFile(filename,data);
+			if(DEBUG){
+				 System.out.println("-----------distrPcktComes (amounts)----------");
+				filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrComeDEBUG.txt";
+				data=Helper.print1D(occupancyDistributionPacketComes);
+				System.out.println(data);
+				Helper.writeToFile(filename,data);
+				System.out.println("--------------distrBefore (amounts)----------");
+				filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrBeforeDEBUG.txt";
+				data=Helper.print2D(occupancyDistributionBefore);
+				System.out.println(data);
+				Helper.writeToFile(filename,data);
+				System.out.println("--------------distrAfter (amounts)-----------");
+				filename="D:/wyniki/"+Helper.FILENAME+"/Queue-"+Q_ID+"-DistrAfterDEBUG.txt";
+				data=Helper.print2D(occupancyDistributionAfter);
+				System.out.println(data);
+				Helper.writeToFile(filename,data);	
+		}
 		StatsRecord sr=new StatsRecord(EN,EW,EWSlot,Ploss,distrCome,distrBefore,distrAfter);
 		return sr;		
 	}
