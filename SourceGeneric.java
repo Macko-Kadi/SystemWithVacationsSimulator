@@ -39,9 +39,14 @@ public abstract class SourceGeneric {
 	 * @param t current time
 	 * @return created packet
 	 */
-	public Packet genPacket(double t){
+	public Packet genPacket(double t, int currRI){
 		int pSize=getPacketSize();
-		Packet p=create(pSize,t);
+		Packet p=null;
+		if (Helper.DEBUG) System.out.println("currRI "+ currRI+ ", RI " + RI);
+		if (currRI==RI)
+			p=create(pSize,t);
+		else
+			if (Helper.DEBUG) System.out.println("ACTIVE - don't create!");
 		tNextGen=Helper.roundDouble(t+calculateInterval(),4);	
 		return p;		
 	}

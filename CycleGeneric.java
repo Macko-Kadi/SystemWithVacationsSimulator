@@ -11,6 +11,8 @@ public class CycleGeneric {
 	private int currSlot;				//current time slot
 	ArrayList<Double> RITimes;			//list of RI phases times
 	final private double CYCLE_TIME;
+	public int[] freeSlotsInTA;
+	public int freeSlots=0;
 	
 	public CycleGeneric(int CYCLE_ID_, ArrayList<Double> RITimes_){	
 		CYCLE_ID=CYCLE_ID_;
@@ -23,6 +25,8 @@ public class CycleGeneric {
 		currRI=0;
 		//tLastChange=-1;
 		CYCLE_TIME=getCycleTime();
+		int numberOfSlots=20;
+		freeSlotsInTA=new int[numberOfSlots];
 	} 
 	
 	protected SystemEvent getEvent(){
@@ -43,7 +47,7 @@ public class CycleGeneric {
 	 * Sets tNextSlot (t+1)
 	 * 
 	 */
-	protected void phaseChange(double t){
+	protected void phaseChange(double t){		
 		currRI=(currRI+1)%numberOfRIs;
 		tNextPhase+=RITimes.get(currRI);
 		slotChange(t);

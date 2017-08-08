@@ -8,29 +8,32 @@ public class SystemWithVacations {
 	ArrayList<Double> listOfRITimes;
 	ArrayList<Integer> listOfBufforsCap;
 	Node node; //only one node in the system is considered
-
-	
+	private int[] freeSlotsInTA;
+	int freeSlots=0;
+	double T0;
+	boolean testDEBUG=false;
 	public SystemWithVacations(int startSeed_){		
+		
 		//set loging paramethers
 		Helper.DEBUG=false;
 		Helper.DEBUG_QUEUE=false;
-		Helper.SAVE_PACKET_TRACE=true;
-		Helper.COMPUTE_DISTRIBUTIONS=false;
+		Helper.SAVE_PACKET_TRACE=false;
 		Helper.DISPLAY_DETAILS_FOR_EACH_SIM=true;
 		Helper.ROUND_DEC=4;
 		
 		//set system parameters !
-		Helper.SLOTED=false;
+		Helper.SLOTED=true;
 		Helper.PRIORITIES=false;
 		Helper.DEBUG_SYSTEM_STATE=true;
-		int GT=0;
-		double T0=10.0;
-		double T1=10.0;
-		double lambda0=0.5*5/10;
-		double lambda1=0.5*5/10;
-		int bufor0 = 800;
-		int bufor1 = 800;
-		Helper.GUARD_TIME=new int[]{GT,GT};
+		T0=5.0;
+		double T1=5.0;
+		double lambda0=0.5; 
+		double lambda1=0.0;
+		int bufor0 = 30;
+		int bufor1 = 2;
+		
+
+		freeSlotsInTA=new int[(int)(T0+1)];
 		/*//Third RI
 		double T2=2.0;
 		double lambda2=0.2;
@@ -38,14 +41,11 @@ public class SystemWithVacations {
 		int seed2 = startSeed_+321;*/
 		
 		//set simulation parameters
-		double SIM_SECONDS=0.4; //aproximated simulation time (in the real world... is there any ?)
+		double SIM_SECONDS=5; //aproximated simulation time (in the real world... is there any ?)
 		Helper.MAX_SIM_TIME=SIM_SECONDS*3000000.0;
 		Helper.START_COLLECT_TIME=SIM_SECONDS*300000.0;	
-		
-	//	Helper.MAX_SIM_TIME=1000;
-	//	Helper.START_COLLECT_TIME=0;	
-		int seed0 = 111+startSeed_;
-		int seed1 = 222+startSeed_+5;
+		int seed0 = startSeed_;
+		int seed1 = startSeed_+5;
 		
 		//add parameters to Helper.FILENAME_PATH
 		String temp="_T1-T2="+T0+"-"+T1+"_L1-L2="+Helper.roundDouble(lambda0,2)+"-"+Helper.roundDouble(lambda1,2)+"_B1-B2="+bufor0+"-"+bufor1;
@@ -63,7 +63,7 @@ public class SystemWithVacations {
 									 1000,  //pSize
 									 true,  //constSize
 									 lambda0,	//lambda 
-									 0.11);	//tStart
+									 3.11);	//tStart
 		
 		SourcePSN src1=new SourcePSN(1, 	//RI
 									 1, 	//SRC_ID
@@ -73,13 +73,13 @@ public class SystemWithVacations {
 									 lambda1,	//lambda 
 									 0.23);	//tStart
 		listOfSources.add(src0);
-		listOfSources.add(src1);
+		//listOfSources.add(src1);
 		listOfRITimes=new ArrayList<Double>(Arrays.asList(T0,T1));
 		listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0,bufor1));
 
 		//SINGLE SYSTEM !
-		//listOfRITimes=new ArrayList<Double>(Arrays.asList(T0));
-		//listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0));
+	//	listOfRITimes=new ArrayList<Double>(Arrays.asList(T0));
+	//	listOfBufforsCap=new ArrayList<Integer>(Arrays.asList(bufor0));
 		
 		/*//ADD THIRD
 		SourcePSN src2=new SourcePSN(2, 	//RI
@@ -103,6 +103,9 @@ public class SystemWithVacations {
 		//for some time we do not collect statistics
 		//waiting for steady state
 		Helper.isAfterStart=false;
+		/**
+		 * number of free slots in one TA period
+		 */
 
 	}
 	
@@ -186,7 +189,26 @@ public class SystemWithVacations {
 					 * 
 					 */
 					currSlot=node.getCurrSlot();
-					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
+					if(Helper.isAfterStart) {
+						node.updateQueuesStatsJustBefore(currSlot);
+					//	System.out.println("======changeSlot======");
+				//		System.out.println("currSlot " + currSlot);
+						if (!node.isServerBusy && currSlot<T0) {				
+							freeSlots++;						
+					//		System.out.println("SERVER NOT BUSY !");					
+					//		System.out.println("freeSlots "   + freeSlots);
+						}
+						else if (node.isServerBusy)
+						{
+					//		System.out.println("currSlot " + currSlot);
+					//		System.out.println("freeSlots "   + freeSlots);
+						}
+					}
+					if(testDEBUG) {
+						System.out.println("======currSlot: " + currSlot );
+						System.out.println("queue just before: ");
+						node.printQueueLength();
+					}
 					node.slotChange(simTime);
 					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
@@ -195,14 +217,38 @@ public class SystemWithVacations {
 					break;
 			case 3: 
 				//3 - change phase and slot
+			//	System.out.println("=====changePhase=====");
 					currSlot=node.getCurrSlot();
-					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
+					if(Helper.isAfterStart){
+						node.updateQueuesStatsJustBefore(currSlot);
+						
+						if (!node.isServerBusy && currSlot<T0) {
+					//		System.out.println("SERVER NOT BUSY !");
+							freeSlots++;
+						}
+					//	else if(node.isServerBusy)
+					//		System.out.println("SERVER BUSY");
+						if (node.getCurrRI()==0) {
+					//		System.out.println("End of RI 0");
+							freeSlotsInTA[freeSlots]++;						
+					//		System.out.println("currSlot " + currSlot);
+					//		System.out.println("freeSlots "+ freeSlots);
+						}
+					//	else
+					//		System.out.println("End of RI 1");
+					}
+					if(testDEBUG) {
+						System.out.println("=======currSlot: " + currSlot );
+						System.out.println("queue just before: ");
+						node.printQueueLength();
+					}
 					node.phaseChange(simTime);
 					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					if(Helper.isAfterStart) node.updateQueuesStatsJustAfter(currSlot);
 					if (Helper.DEBUG) System.out.println(""+simTime+ " change phase RI: "+node.getCurrRI()+" and slot: " +node.getCurrSlot()+" | Event Type=3");
 					if (Helper.DEBUG) node.printQueueLength();
+					freeSlots=0;
 					break;
 			case 4: 
 				//4 - end of service 		--SHOULDN'T_SEE_IT_IN_SLOTED
@@ -218,7 +264,29 @@ public class SystemWithVacations {
 				//6 - end of service and change slot
 					currSlot=node.getCurrSlot();
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
+				//	System.out.println("======end of service and changeSlot======");
+				//	System.out.println("currSlot " + currSlot);
+					if (!node.isServerBusy && currSlot<T0) {				
+						freeSlots++;						
+				//		System.out.println("SERVER NOT BUSY !");					
+				//		System.out.println("freeSlots "   + freeSlots);
+					}
+				//	else if (node.isServerBusy)
+				//	{
+				//		System.out.println("currSlot " + currSlot);
+				//		System.out.println("freeSlots "   + freeSlots);
+				//	}
+					if(testDEBUG) {
+						System.out.println("========currSlot: " + currSlot );
+						System.out.println("queue just before (before end of service): ");
+						node.printQueueLength();
+					}
 					RI=node.endOfService(simTime);
+					if(testDEBUG) {
+						System.out.println("========currSlot: " + currSlot );
+						System.out.println("queue just before (after end of service): ");
+						node.printQueueLength();
+					}
 					node.slotChange(simTime);
 					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
@@ -229,22 +297,59 @@ public class SystemWithVacations {
 			case 7: 
 				//7 - end of service and change phase and slot
 					currSlot=node.getCurrSlot();
-					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
+				//	System.out.println("======end of phase, changeSlot, change phase======");
+					currSlot=node.getCurrSlot();
+					if(Helper.isAfterStart){
+						node.updateQueuesStatsJustBefore(currSlot);
+						
+						if (!node.isServerBusy && currSlot<T0) {
+				//			System.out.println("SERVER NOT BUSY !");
+							freeSlots++;
+						}
+						else if(node.isServerBusy)
+					//		System.out.println("SERVER BUSY");
+						if (node.getCurrRI()==0) {
+					//		System.out.println("End of RI 0");
+							freeSlotsInTA[freeSlots]++;						
+					//		System.out.println("currSlot " + currSlot);
+					//		System.out.println("freeSlots "+ freeSlots);
+						}
+					//	else
+					//		System.out.println("End of RI 1");
+					}
+					if(testDEBUG) {
+						System.out.println("========currSlot: " + currSlot );
+						System.out.println("queue just before (end of service): ");
+						node.printQueueLength();
+					}
 					RI=node.endOfService(simTime);
+					if(testDEBUG) {
+						System.out.println("========currSlot: " + currSlot );
+						System.out.println("queue just before (after end of service): ");
+						node.printQueueLength();
+					}
 					node.phaseChange(simTime);
 					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					if(Helper.isAfterStart) node.updateQueuesStatsJustAfter(currSlot);
 					if (Helper.DEBUG) System.out.println(""+simTime+ " end of service RI: "+RI+" and change phase RI: "+node.getCurrRI()+" and slot: " +node.getCurrSlot()+" | eventType=7");
 					if (Helper.DEBUG) node.printQueueLength();
+					freeSlots=0;
 					break;
 			case 8:
+				
 				//8 - generate Packet 
 				//in case of simultanous source and node event
 				//node events are first
+						
 					if (Helper.DEBUG) System.out.println(""+simTime+ " generation for RI: "+e.objectID+" | eventType=8");
-					Packet p=listOfSources.get(e.objectID).genPacket(simTime);
-					node.addToQueue(simTime, p);
+					//TEST
+					// generation only in TV !
+						Packet p=listOfSources.get(e.objectID).genPacket(simTime, node.getCurrRI());
+						if (p!=null){
+								node.addToQueue(simTime, p);								
+						}
+					//END TEST
 					if (Helper.DEBUG) node.printQueueLength();
 					//Don't take to service - wait for a new slot!
 					//if (node.isItPossibleToServeFromQueue(simTime))
@@ -352,7 +457,7 @@ public class SystemWithVacations {
 				//in case of simultanous source and node event
 				//node events are first
 					if (Helper.DEBUG) System.out.println(""+simTime+ " generation for RI: "+e.objectID+" | eventType=8");
-					Packet p=listOfSources.get(e.objectID).genPacket(simTime);
+					Packet p=listOfSources.get(e.objectID).genPacket(simTime, 1);
 					node.addToQueue(simTime, p);
 					if (Helper.DEBUG) node.printQueueLength();
 					if (node.isItPossibleToTakeFromProperQueue(simTime))
@@ -470,7 +575,7 @@ public class SystemWithVacations {
 				//in case of simultanous source and node event
 				//node events are first
 					if (Helper.DEBUG) System.out.println(""+simTime+ " generation for RI: "+e.objectID+" | eventType=8");
-					Packet p=listOfSources.get(e.objectID).genPacket(simTime);
+					Packet p=listOfSources.get(e.objectID).genPacket(simTime,1);
 					node.addToQueue(simTime, p);
 					if (Helper.DEBUG) node.printQueueLength();
 					//Don't take to service - wait for a new slot!
@@ -532,7 +637,7 @@ public class SystemWithVacations {
 					currSlot=node.getCurrSlot();
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
 					node.phaseChange(simTime);
-					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
+					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
@@ -545,15 +650,13 @@ public class SystemWithVacations {
 			case 4: 
 				//4 - end of service
 					RI=node.endOfService(simTime);
-				//	System.out.println(simTime+"case4 isServerBusy " +node.isServerBusy);
-					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
+					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
 						if (tempRI!=-1) node.takeToServiceFromQueue(simTime, tempRI);
 					}
 					if (Helper.DEBUG) System.out.println(""+simTime+ " end of service RI: "+RI+" | eventType=4");
-			//		System.out.println(simTime+"case 4 isServerBusy " +node.isServerBusy);
 					break;		
 			case 5: 
 				//5 - end of service and change phase --SHOULDN'T_SEE_IT_WHEN_CYCLE_TIME_IS_INT
@@ -566,7 +669,7 @@ public class SystemWithVacations {
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
 					RI=node.endOfService(simTime);
 					node.slotChange(simTime);
-					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
+					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
@@ -582,7 +685,7 @@ public class SystemWithVacations {
 					if(Helper.isAfterStart) node.updateQueuesStatsJustBefore(currSlot);
 					RI=node.endOfService(simTime);
 					node.phaseChange(simTime);
-					if (node.isItPossibleToTakeFromProperQueuePrio(simTime))
+					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
@@ -597,17 +700,14 @@ public class SystemWithVacations {
 				//in case of simultanous source and node event
 				//node events are first
 					if (Helper.DEBUG) System.out.println(""+simTime+ " generation for RI: "+e.objectID+" | eventType=8");
-					Packet p=listOfSources.get(e.objectID).genPacket(simTime);
+					Packet p=listOfSources.get(e.objectID).genPacket(simTime,1);
 					node.addToQueue(simTime, p);
 					if (Helper.DEBUG) node.printQueueLength();
-					if (node.isItPossibleToTakeFromProperQueuePrio(simTime)){
+					if (node.isItPossibleToTakeFromProperQueue(simTime))
 						node.takeToServiceFromQueue(simTime,node.getCurrRI());
-						
-					}
 					else {
 						int tempRI=node.fromWhichQueueCanITakeAPacketContinous(simTime);
 						if (tempRI!=-1) node.takeToServiceFromQueue(simTime, tempRI);
-				//		System.out.println("case 8, tempRI: "+tempRI);
 					}
 					break;
 			}
@@ -640,12 +740,15 @@ public class SystemWithVacations {
 			long tSim=System.currentTimeMillis();
 			srs.add(SWV.getStats(simTime,Helper.DISPLAY_DETAILS_FOR_EACH_SIM));
 			System.out.println("Simulation  Time [ms]: "+(tSim-tStart));
-			SWV.node.listOfQueues.get(0).printDelays("D:/wyniki/queue-delays-Q0-"+Helper.getCurrDate()+"GT"+Helper.GUARD_TIME[0]+".txt");
-		//	SWV.node.listOfQueues.get(1).printDelays("D:/wyniki/queue-delays-Q1-"+Helper.getCurrDate()+"GT"+Helper.GUARD_TIME[1]+".txt");
+			
+			double[] freeSlotsDist=Helper.normalizeDistr1D(SWV.freeSlotsInTA);
+			System.out.println("freeSlotsDist");
+			System.out.println(Helper.print1D(freeSlotsDist));
 		}
 		if (amountOfSim>1){
 			StatsRecord[] res=StatsRecord.computeMeanAndConfidenceInterval(srs);
 			StatsRecord.printMeanStats(res);
 		}
+		
 	}
 }
